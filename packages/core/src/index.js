@@ -13,4 +13,5 @@ export * from './postconditions.js';
 export * from './fleet.js';
 export * from './pnl.js';
 export * from './execution-engine.js';
+export * from './race-engine.js';
 export * from './delegation.js';
