@@ -32,11 +32,12 @@ test('Race Mode rejects missing explicit spend ceilings',()=>{assert.throws(()=>
 
 test('Race gas envelope grows with quantity and remains capped',()=>{assert.equal(defaultRaceGasLimit(1),1000000n);assert.ok(defaultRaceGasLimit(3)>defaultRaceGasLimit(1));assert.equal(defaultRaceGasLimit(100),6000000n);});
 
-test('Race Mode resolves write RPCs separately and includes official low-latency defaults',()=>{
+test('Race Mode combines private write RPCs, official low-latency routes and normal RPC fallbacks',()=>{
   const env={BASE_RPCS:'https://read-one.example,https://read-two.example',BASE_BROADCAST_RPCS:'https://write-one.example/key, https://write-two.example/key'};
-  assert.deepEqual(broadcastRpcUrlsFor('base',env),['https://write-one.example/key','https://write-two.example/key','https://mainnet-preconf.base.org']);
-  assert.deepEqual(broadcastRpcUrlsFor('base',{BASE_RPCS:env.BASE_RPCS}),['https://mainnet-preconf.base.org']);
-  assert.deepEqual(broadcastRpcUrlsFor('robinhood',{}),['https://sequencer.mainnet.chain.robinhood.com']);
+  const base=broadcastRpcUrlsFor('base',env);
+  for(const url of ['https://write-one.example/key','https://write-two.example/key','https://mainnet-preconf.base.org','https://read-one.example','https://read-two.example','https://mainnet.base.org'])assert.ok(base.includes(url),`${url} missing`);
+  const baseDefault=broadcastRpcUrlsFor('base',{});assert.ok(baseDefault.includes('https://mainnet-preconf.base.org'));assert.ok(baseDefault.includes('https://mainnet.base.org'));
+  const robinhood=broadcastRpcUrlsFor('robinhood',{});assert.ok(robinhood.includes('https://sequencer.mainnet.chain.robinhood.com'));assert.ok(robinhood.includes('https://rpc.mainnet.chain.robinhood.com'));
 });
 
 test('Race Mode prepares and signs the exact deterministic transaction before launch',async t=>{
