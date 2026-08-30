@@ -5,8 +5,8 @@ import {spawnSync} from 'node:child_process';
 const required=[
   'README.md','SECURITY.md','.env.example','apps/dashboard/index.html','apps/dashboard/vite.config.js',
   'apps/dashboard/src/main.jsx','apps/dashboard/src/App.jsx','apps/dashboard/src/lib/engine.js',
-  'packages/core/src/intent-firewall.js','packages/cli/src/index.js','packages/agent/src/server.js',
-  'contracts/src/DelegatedMintWallet.sol'
+  'packages/core/src/intent-firewall.js','packages/core/src/race-engine.js','packages/cli/src/index.js','packages/agent/src/server.js',
+  'contracts/src/DelegatedMintWallet.sol','docs/race-mode.md'
 ];
 for(const f of required)if(!fs.existsSync(f)){console.error(`missing required file: ${f}`);process.exit(1);}
 
