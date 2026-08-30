@@ -1,2 +1,2 @@
 TheDadBot integrated release archive staged: 9 parts.
-Environment template present. Canonical Forge formatting enabled. Run full gated validation and publish only on success.
+Environment template present. Canonical Forge formatting and IR compilation enabled. Run full gated validation and publish only on success.
