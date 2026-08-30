@@ -43,7 +43,8 @@ test('Race Mode combines private write RPCs, official low-latency routes and nor
 test('Race Mode prepares and signs the exact deterministic transaction before launch',async t=>{
   const privateKey='0x'+'11'.repeat(32),[{privateKeyToAccount},{parseTransaction}]=await Promise.all([import('viem/accounts'),import('viem')]),account=privateKeyToAccount(privateKey),rpc=await stateRpcServer();t.after(()=>rpc.server.close());
   const plan=futurePlan(account.address),prepared=await prepareRaceTransaction({privateKey,plan,rpcUrls:[rpc.url],limits:{maxMintValueWei:1000n,maxNetworkFeeWei:2000000000000000n,maxTotalSpendWei:2000000000001000n,balanceReserveWei:0n},gasLimit:1000000n,maxFeePerGasWei:1000000000n,maxPriorityFeePerGasWei:100000000n});
-  assert.equal(prepared.account.toLowerCase(),account.address.toLowerCase());assert.equal(prepared.simulation,'SKIPPED_UPCOMING');assert.match(prepared.txHash,/^0x[0-9a-f]{64}$/i);assert.ok(!JSON.stringify(prepared).includes(privateKey.slice(2)));
+  const safeSerialised=JSON.stringify(prepared,(_,v)=>typeof v==='bigint'?v.toString():v);
+  assert.equal(prepared.account.toLowerCase(),account.address.toLowerCase());assert.equal(prepared.simulation,'SKIPPED_UPCOMING');assert.match(prepared.txHash,/^0x[0-9a-f]{64}$/i);assert.ok(!safeSerialised.includes(privateKey.slice(2)));
   const tx=parseTransaction(prepared.rawTx);assert.equal(tx.to.toLowerCase(),plan.to.toLowerCase());assert.equal(tx.data,plan.data);assert.equal(tx.value,1000n);assert.equal(tx.nonce,0);assert.equal(tx.gas,1000000n);assert.equal(tx.maxFeePerGas,1000000000n);assert.equal(tx.maxPriorityFeePerGas,100000000n);
 });
 
