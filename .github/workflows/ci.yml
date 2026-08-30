@@ -21,10 +21,15 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Security and core checks
         run: npm run check
+      - name: Race Mode hot-path smoke
+        run: npm run race:bench -- 10
       - name: Vite production build
         run: npm run dashboard:build
       - name: CLI smoke
-        run: npm run cli -- chains
+        shell: bash
+        run: |
+          npm run cli -- chains
+          npm run cli -- --help | grep 'Race Mode'
       - name: Dashboard smoke
         shell: bash
         run: |
