@@ -89,6 +89,9 @@ function racePost(url,body,{timeoutMs=3500}={}){
         resolve({json,latencyMs:endedPerf-startedPerf,reusedSocket:Boolean(req.reusedSocket),endedPerf});
       });
     });
+    // Small JSON-RPC writes should leave immediately instead of waiting for Nagle batching.
+    // This is applied to both warmed and newly-created sockets and remains local-only.
+    req.on('socket',socket=>{if(typeof socket.setNoDelay==='function')socket.setNoDelay(true);});
     req.setTimeout(timeoutMs,()=>req.destroy(new RpcError('RPC timeout',{url,method:'eth_sendRawTransaction'})));
     req.on('error',error=>reject(error instanceof RpcError?error:new RpcError(String(error?.message||error),{url,method:'eth_sendRawTransaction',cause:error})));
     req.end(body);
