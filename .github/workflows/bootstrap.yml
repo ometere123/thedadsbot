@@ -3,7 +3,7 @@ name: Bootstrap TheDadBot
 on:
   push:
     paths:
-      - '.bootstrap.mjs'
+      - '.bootstrap.ready'
 
 permissions:
   contents: write
@@ -21,7 +21,20 @@ jobs:
         with:
           version: stable
       - name: Expand release tree
-        run: node .bootstrap.mjs
+        shell: bash
+        run: |
+          cat .bootstrap/part-* | base64 --decode | gzip -dc > /tmp/thedadbot-release.json
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const files = JSON.parse(fs.readFileSync('/tmp/thedadbot-release.json', 'utf8'));
+          for (const [name, content] of Object.entries(files)) {
+            const target = path.resolve(name);
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.writeFileSync(target, content);
+          }
+          console.log(`expanded ${Object.keys(files).length} TheDadBot files`);
+          NODE
       - name: Install dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Node/security checks
@@ -36,7 +49,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git restore --staged .bootstrap.mjs .github/workflows/bootstrap.yml
+          git restore --staged .bootstrap .bootstrap.ready .github/workflows/bootstrap.yml
           if git diff --cached --quiet; then
             echo "No release changes to commit"
             exit 0
