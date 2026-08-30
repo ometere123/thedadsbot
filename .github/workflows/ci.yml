@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, react-dashboard-migration]
   pull_request:
 
 permissions:
@@ -21,6 +21,8 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Security and core checks
         run: npm run check
+      - name: Vite production build
+        run: npm run dashboard:build
       - name: CLI smoke
         run: npm run cli -- chains
       - name: Dashboard smoke
@@ -29,8 +31,8 @@ jobs:
           npm run dashboard > /tmp/dashboard.log 2>&1 &
           PID=$!
           trap 'kill $PID || true' EXIT
-          for i in {1..20}; do
-            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ | grep -q 'id="root"'; then exit 0; fi
             sleep 0.25
           done
           cat /tmp/dashboard.log
@@ -52,6 +54,21 @@ jobs:
             http://127.0.0.1:19741/policy/validate)
           test "$status" = "400"
           grep 'secrets are never accepted' /tmp/reject.json
+      - name: Local-agent private-network preflight
+        shell: bash
+        run: |
+          THEDADBOT_AGENT_PORT=19742 THEDADBOT_DASHBOARD_ORIGINS=https://example.vercel.app npm run agent > /tmp/agent-pna.log 2>&1 &
+          PID=$!
+          trap 'kill $PID || true' EXIT
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:19742/health >/dev/null; then break; fi
+            sleep 0.25
+          done
+          curl -si -X OPTIONS \
+            -H 'Origin: https://example.vercel.app' \
+            -H 'Access-Control-Request-Method: GET' \
+            -H 'Access-Control-Request-Private-Network: true' \
+            http://127.0.0.1:19742/health | tr -d '\r' | grep -i '^access-control-allow-private-network: true$'
 
   solidity:
     runs-on: ubuntu-latest
