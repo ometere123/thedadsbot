@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "public": false,
   "buildCommand": "npm run dashboard:build",
   "outputDirectory": "apps/dashboard/dist",
   "headers": [
