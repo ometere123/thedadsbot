@@ -52,12 +52,29 @@ A second warm pass is performed shortly before launch when enough time remains.
 
 Read RPCs and broadcast RPCs can be different.
 
-- `--rpc` supplies endpoints used for state reads, ranking and preflight.
-- `--broadcast-rpc` optionally supplies write endpoints used only for the raw-transaction fanout.
+Read/quorum endpoints use the normal local chain variable, for example:
 
-This allows a user to retain independent read verification while adding low-latency, paid, private or direct-sequencer write endpoints without treating those endpoints as state authorities.
+```env
+BASE_RPCS=https://read-one.example,https://read-two.example
+```
 
-Never publish private RPC URLs containing credentials.
+Race-only write endpoints can be kept separately:
+
+```env
+BASE_BROADCAST_RPCS=https://fast-write-one.example,https://fast-write-two.example
+```
+
+Equivalent `*_BROADCAST_RPCS` variables exist for the built-in networks. The selection order is:
+
+1. explicit `--broadcast-rpc` command option;
+2. local `<CHAIN>_BROADCAST_RPCS`;
+3. healthy benchmarked read RPCs as fallback.
+
+`--rpc` controls the read/preflight set. A fast write endpoint does not become a state authority merely because it is in the broadcast set.
+
+Paid/private/direct-sequencer endpoints often contain credentials. Prefer the local `*_BROADCAST_RPCS` variables rather than command-line arguments for those endpoints. Never commit the real values and never expose them in Vercel or any `VITE_*` variable.
+
+Race reports and normal CLI output reduce recorded broadcast URLs to their origins so credential-bearing paths/query strings are not persisted in the report.
 
 ## Gas before an unopened stage
 
@@ -146,7 +163,7 @@ Every completed race report records:
 - transaction fingerprint, nonce, gas limit and fee fields;
 - NFT postcondition result.
 
-The default report is written to `.data/race-last.json`, which is gitignored.
+The default report is written to `.data/race-last.json`, which is gitignored. The raw signed transaction is not written to the report.
 
 ## Local regression benchmark
 
