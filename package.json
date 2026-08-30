@@ -19,7 +19,7 @@
     "doctor": "node packages/cli/src/index.js doctor"
   },
   "dependencies": {
-    "@opensea/sdk": "^11.9.0",
+    "@opensea/sdk": "^12.0.1",
     "ethers": "^6.15.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
