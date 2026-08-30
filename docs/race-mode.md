@@ -40,6 +40,12 @@ This is a deliberate compromise: retain a pre-signed T=0 broadcast without carry
 
 For the most predictable result, use a dedicated mint wallet that has no other pending transaction activity while armed.
 
+## Fast quorum before signing
+
+The final deterministic drop re-check still requires independent RPC agreement, but quorum reads return as soon as the required matching observations arrive. They do not wait for a slow tail endpoint once enough independent sources already agree.
+
+Outstanding RPC requests are cancelled after quorum is reached. This preserves the safety threshold without allowing one slow provider to consume the arming window.
+
 ## Persistent write sockets
 
 Race Mode does not use the normal `fetch()` RPC path for launch broadcast.
@@ -48,7 +54,7 @@ It maintains explicit Node HTTP/HTTPS keep-alive agents. `warmRpcConnections()` 
 
 A second warm pass is performed shortly before launch when enough time remains.
 
-## RPC separation
+## RPC separation and direct routes
 
 Read RPCs and broadcast RPCs can be different.
 
@@ -64,17 +70,23 @@ Race-only write endpoints can be kept separately:
 BASE_BROADCAST_RPCS=https://fast-write-one.example,https://fast-write-two.example
 ```
 
-Equivalent `*_BROADCAST_RPCS` variables exist for the built-in networks. The selection order is:
+Equivalent `*_BROADCAST_RPCS` variables exist for the built-in networks.
 
-1. explicit `--broadcast-rpc` command option;
-2. local `<CHAIN>_BROADCAST_RPCS`;
-3. healthy benchmarked read RPCs as fallback.
+Without an explicit `--broadcast-rpc` override, TheDadBot fans the same signed bytes across the combined local write set, built-in low-latency route where one is documented, and normal RPC routes. A failed or slow endpoint does not delay the others.
+
+Current built-in low-latency routes include:
+
+- Base: `https://mainnet-preconf.base.org` for Flashblocks/pre-confirmation submission;
+- Robinhood Chain: `https://sequencer.mainnet.chain.robinhood.com`;
+- Robinhood Chain Testnet: `https://sequencer.testnet.chain.robinhood.com`.
+
+Base's Flashblocks endpoint is also part of the default read set so `pending` nonce/state can reflect pre-confirmed sequencer state during the short pre-sign window.
 
 `--rpc` controls the read/preflight set. A fast write endpoint does not become a state authority merely because it is in the broadcast set.
 
 Paid/private/direct-sequencer endpoints often contain credentials. Prefer the local `*_BROADCAST_RPCS` variables rather than command-line arguments for those endpoints. Never commit the real values and never expose them in Vercel or any `VITE_*` variable.
 
-Race reports and normal CLI output reduce recorded broadcast URLs to their origins so credential-bearing paths/query strings are not persisted in the report.
+Race reports do not persist full credential-bearing RPC URLs. Endpoint positions and timing measurements are sufficient for performance analysis.
 
 ## Gas before an unopened stage
 
@@ -155,7 +167,7 @@ Every completed race report records:
 - stage start and target time;
 - trigger drift;
 - local fanout dispatch duration;
-- first accepting RPC;
+- first accepting endpoint index;
 - first-RPC acceptance latency from T=0;
 - per-endpoint acceptance/rejection and socket-reuse state;
 - receipt observation time;
