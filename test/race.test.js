@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import {assertRacePlan,blastPreparedRaw,buildPublicMintPlan,defaultRaceGasLimit,prepareRaceTransaction,prepareRawBroadcast,validateRaceLimits,waitUntilEpoch} from '../packages/core/src/index.js';
+import {assertRacePlan,blastPreparedRaw,broadcastRpcUrlsFor,buildPublicMintPlan,defaultRaceGasLimit,prepareRaceTransaction,prepareRawBroadcast,validateRaceLimits,waitUntilEpoch} from '../packages/core/src/index.js';
 
 const NFT='0x1111111111111111111111111111111111111111';
 const WALLET='0x2222222222222222222222222222222222222222';
@@ -31,6 +31,12 @@ test('Race Mode accepts deterministic upcoming SeaDrop plan',()=>{const plan=fut
 test('Race Mode rejects missing explicit spend ceilings',()=>{assert.throws(()=>validateRaceLimits({maxMintValueWei:1n}),/maxNetworkFeeWei/);});
 
 test('Race gas envelope grows with quantity and remains capped',()=>{assert.equal(defaultRaceGasLimit(1),1000000n);assert.ok(defaultRaceGasLimit(3)>defaultRaceGasLimit(1));assert.equal(defaultRaceGasLimit(100),6000000n);});
+
+test('Race Mode resolves write RPCs separately from read RPCs',()=>{
+  const env={BASE_RPCS:'https://read-one.example,https://read-two.example',BASE_BROADCAST_RPCS:'https://write-one.example/key, https://write-two.example/key'};
+  assert.deepEqual(broadcastRpcUrlsFor('base',env),['https://write-one.example/key','https://write-two.example/key']);
+  assert.deepEqual(broadcastRpcUrlsFor('base',{BASE_RPCS:env.BASE_RPCS}),[]);
+});
 
 test('Race Mode prepares and signs the exact deterministic transaction before launch',async t=>{
   const privateKey='0x'+'11'.repeat(32),[{privateKeyToAccount},{parseTransaction}]=await Promise.all([import('viem/accounts'),import('viem')]),account=privateKeyToAccount(privateKey),rpc=await stateRpcServer();t.after(()=>rpc.server.close());
