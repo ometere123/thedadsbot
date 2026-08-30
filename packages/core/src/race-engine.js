@@ -98,7 +98,7 @@ export async function waitForReceiptAny(rpcUrls,txHash,{timeoutMs=120000,pollMs=
   const deadline=Date.now()+Number(timeoutMs);
   while(Date.now()<deadline){
     const rows=await Promise.allSettled(urls.map(url=>rpcCall(url,'eth_getTransactionReceipt',[txHash],{timeoutMs:perCallTimeoutMs})));
-    for(let i=0;i<rows.length;i++)if(rows[i].status==='fulfilled'&&rows[i].value)return {receipt:rows[i].value,url:urls[i],observedAtEpochMs:Date.now()};
+    for(let i=0;i<rows.length;i++)if(rows[i].status==='fulfilled'&&rows[i].value)return {receipt:rows[i].value,url:urls[i],index:i,observedAtEpochMs:Date.now()};
     await sleep(pollMs);
   }
   throw new Error('receipt timeout; transaction may still be pending');
@@ -120,7 +120,8 @@ export async function launchPreparedRaceTransaction({
   // prepared eth_sendRawTransaction requests before waiting for any response.
   const blast=blastPreparedRaw(urls,prepared.preparedBroadcast,{expectedHash:prepared.txHash,timeoutMs:broadcastTimeoutMs});
   const first=await blast.firstAccepted;
-  const receiptPromise=waitForReceiptAny([first.url,...urls],prepared.txHash,{timeoutMs:receiptTimeoutMs});
+  const receiptInputs=[first.url,...urls.filter(url=>url!==first.url)];
+  const receiptPromise=waitForReceiptAny(receiptInputs,prepared.txHash,{timeoutMs:receiptTimeoutMs});
   const [broadcasts,receiptSeen]=await Promise.all([blast.allSettled,receiptPromise]);
   const post=await verifyMintPostcondition(receiptSeen.receipt,{nftContract:prepared.plan.nftContract,recipient:prepared.plan.recipient||prepared.account,minQuantity:prepared.plan.quantity||1});
   const blockNumber=receiptSeen.receipt?.blockNumber?Number(BigInt(receiptSeen.receipt.blockNumber)):null;
@@ -129,8 +130,8 @@ export async function launchPreparedRaceTransaction({
     telemetry:{
       preparedAtEpochMs:prepared.preparedAtEpochMs,stageStartEpochMs:stageEpochMs,targetEpochMs:target,triggerActualEpochMs:trigger.actualEpochMs,triggerDriftMs:trigger.driftMs,
       dispatchStartedEpochMs:blast.launchEpochMs,dispatchMsFromTarget:blast.launchEpochMs-target,localDispatchDurationMs:blast.dispatchDurationMs,
-      firstAcceptedRpc:first.url,firstAcceptedEpochMs:first.acceptedEpochMs,firstAcceptedMsFromTarget:first.acceptedEpochMs-target,firstRpcLatencyMs:first.latencyMs,
-      receiptObservedEpochMs:receiptSeen.observedAtEpochMs,receiptObservedMsFromTarget:receiptSeen.observedAtEpochMs-target,receiptRpc:receiptSeen.url,blockNumber,
+      firstAcceptedRpcIndex:first.index,firstAcceptedEpochMs:first.acceptedEpochMs,firstAcceptedMsFromTarget:first.acceptedEpochMs-target,firstRpcLatencyMs:first.latencyMs,
+      receiptObservedEpochMs:receiptSeen.observedAtEpochMs,receiptObservedMsFromTarget:receiptSeen.observedAtEpochMs-target,receiptRpcIndex:receiptSeen.index,blockNumber,
       fingerprint:prepared.fingerprint,nonce:prepared.nonce,gasLimit:String(prepared.gasLimit),maxFeePerGas:String(prepared.maxFeePerGas),maxPriorityFeePerGas:String(prepared.maxPriorityFeePerGas),simulation:prepared.simulation,
     },
   };
