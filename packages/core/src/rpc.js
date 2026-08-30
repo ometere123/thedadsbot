@@ -9,28 +9,43 @@ export class RpcQuorumError extends RpcError {
 }
 
 let requestId=1;
-export async function rpcCall(url,method,params=[],{timeoutMs=6000}={}){
+export async function rpcCall(url,method,params=[],{timeoutMs=6000,signal}={}){
   if(!/^https?:\/\//i.test(String(url||''))) throw new RpcError('RPC URL must be http(s)',{url,method});
-  const ctrl=new AbortController(); const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  const ctrl=new AbortController();let timedOut=false;
+  const onAbort=()=>ctrl.abort(signal?.reason);if(signal){if(signal.aborted)ctrl.abort(signal.reason);else signal.addEventListener('abort',onAbort,{once:true});}
+  const timer=setTimeout(()=>{timedOut=true;ctrl.abort();},timeoutMs);
   try{
     const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:requestId++,method,params}),signal:ctrl.signal,redirect:'error'});
     if(!r.ok) throw new RpcError(`RPC HTTP ${r.status}`,{url,method});
     const body=await r.json(); if(body.error) throw new RpcError(body.error.message || `RPC error ${body.error.code}`,{url,method});
     return body.result;
-  }catch(error){ if(error instanceof RpcError) throw error; throw new RpcError(error?.name==='AbortError'?'RPC timeout':String(error?.message||error),{url,method,cause:error}); }
-  finally{ clearTimeout(timer); }
+  }catch(error){ if(error instanceof RpcError) throw error; throw new RpcError(error?.name==='AbortError'?(timedOut?'RPC timeout':'RPC cancelled'):String(error?.message||error),{url,method,cause:error}); }
+  finally{ clearTimeout(timer);if(signal)signal.removeEventListener('abort',onAbort); }
 }
 
 export async function quorumRead(urls,method,params=[],{minAgree,timeoutMs=6000,normalise=v=>JSON.stringify(v)}={}){
   const unique=[...new Set((urls||[]).filter(Boolean))]; if(!unique.length) throw new RpcQuorumError('no RPC endpoints configured');
   const required=Math.max(1,Math.min(Number(minAgree || Math.min(2,unique.length)),unique.length));
-  const started=performance.now();
-  const settled=await Promise.allSettled(unique.map(async url=>{ const t=performance.now(); const value=await rpcCall(url,method,params,{timeoutMs}); return {url,value,latencyMs:performance.now()-t}; }));
-  const observations=settled.map((r,i)=>r.status==='fulfilled'?{ok:true,...r.value}:{ok:false,url:unique[i],error:String(r.reason?.message||r.reason)});
-  const groups=new Map(); for(const row of observations.filter(x=>x.ok)){ const key=normalise(row.value); const list=groups.get(key)||[]; list.push(row); groups.set(key,list); }
-  const winner=[...groups.values()].sort((a,b)=>b.length-a.length)[0]||[];
-  if(winner.length<required) throw new RpcQuorumError(`RPC quorum not reached for ${method}`,observations);
-  return {value:winner[0].value,required,agreeing:winner.map(x=>x.url),observations,elapsedMs:performance.now()-started};
+  const started=performance.now(),master=new AbortController(),observations=[],groups=new Map();
+  let completed=0,finished=false;
+  return new Promise((resolve,reject)=>{
+    const failIfImpossible=()=>{
+      if(finished)return;const remaining=unique.length-completed,maxGroup=Math.max(0,...[...groups.values()].map(rows=>rows.length));
+      if(maxGroup+remaining<required){finished=true;master.abort();reject(new RpcQuorumError(`RPC quorum not reached for ${method}`,[...observations]));}
+    };
+    unique.forEach(url=>{
+      const t=performance.now();
+      rpcCall(url,method,params,{timeoutMs,signal:master.signal}).then(value=>{
+        if(finished)return;completed++;const row={ok:true,url,value,latencyMs:performance.now()-t};observations.push(row);
+        let key;try{key=normalise(value);}catch(error){row.ok=false;row.error=`normalise failed: ${error.message}`;failIfImpossible();return;}
+        const list=groups.get(key)||[];list.push(row);groups.set(key,list);
+        if(list.length>=required){finished=true;const result={value:list[0].value,required,agreeing:list.map(x=>x.url),observations:[...observations],elapsedMs:performance.now()-started};master.abort();resolve(result);return;}
+        failIfImpossible();
+      }).catch(error=>{
+        if(finished)return;completed++;observations.push({ok:false,url,error:String(error?.message||error),latencyMs:performance.now()-t});failIfImpossible();
+      });
+    });
+  });
 }
 
 export async function benchmarkRpcs(urls,{timeoutMs=5000}={}){
