@@ -1,0 +1,4 @@
+import { assertAddress } from './hex.js';
+export function fleetSummary(wallets=[]){return {wallets:wallets.length,enabled:wallets.filter(x=>x.enabled!==false).length,labels:wallets.map((w,i)=>w.label||`wallet-${i+1}`)};}
+export function buildFundingPlan({from,wallets,amountWei}){assertAddress(from,'funding wallet');if(!wallets?.length)throw new Error('wallets required');const value=BigInt(amountWei);if(value<=0n)throw new Error('fund amount must be positive');return wallets.map(w=>({kind:'fund',from,to:assertAddress(w.address,'wallet address'),value:value.toString()}));}
+export function buildSweepPlan({wallets,to,reserveWei=0}){assertAddress(to,'sweep destination');return wallets.map(w=>({kind:'sweep',from:assertAddress(w.address,'wallet address'),to,reserveWei:BigInt(reserveWei).toString()}));}

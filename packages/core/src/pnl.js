@@ -1,0 +1,1 @@
+export function computePnl(events=[]){let spent=0n,received=0n,gas=0n;for(const e of events){spent+=BigInt(e.spentWei||0);received+=BigInt(e.receivedWei||0);gas+=BigInt(e.gasWei||0);}return {spentWei:spent,receivedWei:received,gasWei:gas,pnlWei:received-spent-gas};}

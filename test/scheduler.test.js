@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {Scheduler} from '../packages/core/src/scheduler.js';
+test('scheduler runs due job exactly once',async()=>{const s=new Scheduler();let n=0;s.add({id:'a',at:new Date(0).toISOString(),run:async()=>++n});await s.tick(Date.now());await s.tick(Date.now());assert.equal(n,1);assert.equal(s.list()[0].status,'done');});
+test('scheduler rejects duplicate id',()=>{const s=new Scheduler();s.add({id:'a',at:new Date().toISOString(),run:()=>{}});assert.throws(()=>s.add({id:'a',at:new Date().toISOString(),run:()=>{}}),/duplicate/);});

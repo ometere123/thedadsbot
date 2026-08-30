@@ -1,0 +1,6 @@
+{
+  "name": "@thedadbot/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": { "thedadbot": "./src/index.js" }
+}

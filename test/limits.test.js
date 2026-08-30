@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {enforceSpendLimits} from '../packages/core/src/spend-limits.js';
+test('spend limits calculate maximum fee exposure',()=>{const x=enforceSpendLimits({mintValueWei:100n,gasLimit:100n,maxFeePerGasWei:2n,balanceWei:1000n,limits:{maxTotalSpendWei:350n,balanceReserveWei:100n}});assert.equal(x.totalSpendWei,300n);assert.equal(x.balanceAfterWei,700n);});
+test('spend limit blocks excessive network fee',()=>assert.throws(()=>enforceSpendLimits({mintValueWei:0n,gasLimit:100n,maxFeePerGasWei:3n,balanceWei:1000n,limits:{maxNetworkFeeWei:299n}}),/network fee/));
+test('reserve is fail closed',()=>assert.throws(()=>enforceSpendLimits({mintValueWei:100n,gasLimit:10n,maxFeePerGasWei:1n,balanceWei:150n,limits:{balanceReserveWei:50n}}),/insufficient balance/));

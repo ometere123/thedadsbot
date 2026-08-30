@@ -1,0 +1,27 @@
+{
+  "name": "thedadbot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Open multi-chain NFT mint operations platform: dashboard, local agent and CLI sharing one safety core.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "npm test && node scripts/secret-scan.js && node scripts/repo-check.js",
+    "cli": "node packages/cli/src/index.js",
+    "agent": "node packages/agent/src/server.js",
+    "dashboard": "node packages/agent/src/static-server.js",
+    "doctor": "node packages/cli/src/index.js doctor"
+  },
+  "dependencies": {
+    "@opensea/sdk": "^11.9.0",
+    "viem": "^2.0.0",
+    "ethers": "^6.15.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

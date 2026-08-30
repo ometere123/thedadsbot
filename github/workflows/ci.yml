@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Security and core checks
+        run: npm run check
+      - name: CLI smoke
+        run: npm run cli -- chains
+      - name: Dashboard smoke
+        shell: bash
+        run: |
+          npm run dashboard > /tmp/dashboard.log 2>&1 &
+          PID=$!
+          trap 'kill $PID || true' EXIT
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 0.25
+          done
+          cat /tmp/dashboard.log
+          exit 1
+      - name: Local-agent smoke and secret-input rejection
+        shell: bash
+        run: |
+          THEDADBOT_AGENT_PORT=19741 npm run agent > /tmp/agent.log 2>&1 &
+          PID=$!
+          trap 'kill $PID || true' EXIT
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:19741/health >/dev/null; then break; fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:19741/health | grep 'never accepted over HTTP'
+          DUMMY_KEY=0x$(printf 'aa%.0s' {1..32})
+          status=$(curl -sS -o /tmp/reject.json -w '%{http_code}' -X POST -H 'content-type: application/json' \
+            -d "{\"privateKey\":\"$DUMMY_KEY\"}" \
+            http://127.0.0.1:19741/policy/validate)
+          test "$status" = "400"
+          grep 'secrets are never accepted' /tmp/reject.json
+
+  solidity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Forge format check
+        run: forge fmt --check
+      - name: Forge tests
+        run: forge test -vvv

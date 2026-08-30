@@ -1,0 +1,6 @@
+export const STATES=Object.freeze(['CREATED','DISCOVERED','ELIGIBLE','PLANNED','VALIDATED','ARMED','TRIGGERED','SIMULATED','SIGNED','BROADCAST','PENDING','CONFIRMED','FAILED','SKIPPED','CANCELLED']);
+const edges=new Map([
+ ['CREATED',['DISCOVERED','PLANNED','CANCELLED','FAILED']],['DISCOVERED',['ELIGIBLE','PLANNED','SKIPPED','CANCELLED','FAILED']],['ELIGIBLE',['PLANNED','SKIPPED','CANCELLED','FAILED']],['PLANNED',['VALIDATED','CANCELLED','FAILED']],['VALIDATED',['ARMED','SIMULATED','SKIPPED','CANCELLED','FAILED']],['ARMED',['TRIGGERED','SKIPPED','CANCELLED','FAILED']],['TRIGGERED',['SIMULATED','FAILED']],['SIMULATED',['SIGNED','SKIPPED','FAILED']],['SIGNED',['BROADCAST','FAILED']],['BROADCAST',['PENDING','CONFIRMED','FAILED']],['PENDING',['CONFIRMED','FAILED']]
+]);
+export function transition(current,next){if(!STATES.includes(current)||!STATES.includes(next))throw new Error('unknown lifecycle state');if(!(edges.get(current)||[]).includes(next))throw new Error(`invalid transition ${current} -> ${next}`);return next;}
+export class RunState{constructor(seed={}){this.state='CREATED';this.history=[{state:'CREATED',at:new Date().toISOString(),...seed}];}move(next,meta={}){this.state=transition(this.state,next);this.history.push({state:next,at:new Date().toISOString(),...meta});return this.state;}}

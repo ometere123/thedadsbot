@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.data/
+*.log
+*.enc.json
+*.vault.json
+coverage/
+out/
+cache/
+broadcast/
+.DS_Store
