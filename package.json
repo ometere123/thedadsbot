@@ -15,6 +15,7 @@
     "dashboard": "vite --config apps/dashboard/vite.config.js",
     "dashboard:build": "vite build --config apps/dashboard/vite.config.js",
     "dashboard:preview": "vite preview --config apps/dashboard/vite.config.js",
+    "race:bench": "node scripts/race-benchmark.js",
     "doctor": "node packages/cli/src/index.js doctor"
   },
   "dependencies": {
