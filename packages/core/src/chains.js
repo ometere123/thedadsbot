@@ -22,6 +22,11 @@ export function rpcUrlsFor(chain, env=process.env){
   const custom = String(env[c.env] || '').split(',').map(x=>x.trim()).filter(Boolean);
   return [...new Set([...custom, ...(c.defaultRpcs || [])])];
 }
+export function broadcastRpcUrlsFor(chain, env=process.env){
+  const c=typeof chain==='object'?chain:chainByKey(chain);if(!c)throw new Error(`unknown chain: ${chain}`);
+  const key=String(c.env||'RPCS').replace(/_RPCS$/,'_BROADCAST_RPCS');
+  return [...new Set(String(env[key]||'').split(',').map(x=>x.trim()).filter(Boolean))];
+}
 export function customChain({id,name='Custom EVM',currency='ETH',explorer='',rpcUrls=[]}){
   if(!Number.isSafeInteger(Number(id)) || Number(id) <= 0) throw new Error('invalid custom chain id');
   return Object.freeze({key:`custom-${id}`,id:Number(id),name,currency,explorer,defaultRpcs:[...rpcUrls]});
