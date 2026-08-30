@@ -1,2 +1,2 @@
 TheDadBot integrated release archive staged: 9 parts.
-Validate Node/security checks and Foundry before publishing the expanded tree.
+Environment template present. Re-run full Node/security + Foundry validation before publishing.
