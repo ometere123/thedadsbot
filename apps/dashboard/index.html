@@ -1,92 +1,18 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <meta name="description" content="TheDadBot — open multi-chain NFT mint operations dashboard.">
-  <title>TheDadBot</title>
-  <link rel="stylesheet" href="./styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#080a0c" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="TheDadBot — security-first multi-chain NFT mint operations." />
+  <meta property="og:title" content="TheDadBot" />
+  <meta property="og:description" content="Move fast without signing blind." />
+  <meta property="og:type" content="website" />
+  <title>TheDadBot — Mint Operations</title>
 </head>
 <body>
-<div class="app-shell">
-  <aside class="sidebar">
-    <div class="brand"><span class="brand-mark">D</span><div><strong>TheDadBot</strong><small>mint operations</small></div></div>
-    <nav id="nav">
-      <button class="nav-item active" data-view="overview"><span>01</span>Overview</button>
-      <button class="nav-item" data-view="discover"><span>02</span>Discover</button>
-      <button class="nav-item" data-view="mint"><span>03</span>Mint console</button>
-      <button class="nav-item" data-view="wallets"><span>04</span>Wallets</button>
-      <button class="nav-item" data-view="automation"><span>05</span>Automation</button>
-      <button class="nav-item" data-view="activity"><span>06</span>Activity</button>
-    </nav>
-    <div class="trust-card">
-      <div class="trust-dot"></div>
-      <div><strong>Non-custodial</strong><small>No seed phrase. No browser key import.</small></div>
-    </div>
-  </aside>
-
-  <main>
-    <header class="topbar">
-      <div><p class="kicker">MULTI-CHAIN EXECUTION</p><h1 id="view-title">Operations overview</h1></div>
-      <div class="top-actions"><button id="agent-button" class="chip ghost">Agent offline</button><button id="connect" class="primary">Connect wallet</button></div>
-    </header>
-
-    <section class="view active" id="view-overview">
-      <div class="hero-panel">
-        <div class="hero-copy"><p class="eyebrow">ONE ENGINE · THREE SURFACES</p><h2>Move fast without signing blind.</h2><p>TheDadBot checks chain, target, calldata, value and NFT outcome before calling a mint successful.</p><div class="hero-actions"><button class="primary" data-jump="mint">Open mint console</button><button class="secondary" data-jump="discover">Find drops</button></div></div>
-        <div class="radar">
-          <div class="radar-ring r1"></div><div class="radar-ring r2"></div><div class="radar-ring r3"></div><div class="radar-core">D</div>
-          <span class="radar-label l1">RPC quorum</span><span class="radar-label l2">intent firewall</span><span class="radar-label l3">postcondition</span>
-        </div>
-      </div>
-      <div class="metric-grid">
-        <article><span>Wallet</span><strong id="metric-wallet">Not connected</strong><small>Injected wallet only in browser mode</small></article>
-        <article><span>Network</span><strong id="metric-chain">Not connected</strong><small id="metric-block">Awaiting provider</small></article>
-        <article><span>Local agent</span><strong id="metric-agent">Offline</strong><small>CLI / fleets / OpenSea API / automation</small></article>
-        <article><span>Safety mode</span><strong>Fail closed</strong><small>Opaque API plans cannot use AUTO</small></article>
-      </div>
-      <div class="two-col">
-        <article class="panel"><div class="panel-head"><div><p class="eyebrow">EXECUTION PATH</p><h3>What happens before broadcast</h3></div><span class="badge good">shared core</span></div><div class="pipeline"><div><b>01</b><span>Discover / resolve</span></div><i></i><div><b>02</b><span>Verify intent</span></div><i></i><div><b>03</b><span>Simulate</span></div><i></i><div><b>04</b><span>Sign locally</span></div><i></i><div><b>05</b><span>Verify NFT</span></div></div></article>
-        <article class="panel"><div class="panel-head"><div><p class="eyebrow">BUILT-IN CHAINS</p><h3>Not tied to one network</h3></div></div><div class="chain-cloud"><span>Ethereum</span><span>Base</span><span>Robinhood</span><span>Arbitrum</span><span>Optimism</span><span>Polygon</span><span>Zora</span><span>Custom EVM</span></div></article>
-      </div>
-    </section>
-
-    <section class="view" id="view-discover">
-      <div class="section-intro"><div><p class="eyebrow">OPENSEA DROPS</p><h2>Upcoming, featured and recently minted.</h2><p>Discovery runs through your local agent so the hosted page never exposes your OpenSea API key.</p></div><div class="inline-controls"><select id="drop-type"><option value="upcoming">Upcoming</option><option value="featured">Featured</option><option value="recently_minted">Recently minted</option></select><input id="drop-chain" placeholder="chain e.g. base"><button id="load-drops" class="primary">Load drops</button></div></div>
-      <div id="drops" class="drop-grid"><div class="empty-state"><strong>Local agent required for discovery</strong><span>Run <code>npm run agent</code> with an OpenSea API key, or use the CLI.</span></div></div>
-    </section>
-
-    <section class="view" id="view-mint">
-      <div class="section-intro"><div><p class="eyebrow">DETERMINISTIC SEADROP</p><h2>Plan it. Inspect it. Then mint it.</h2><p>Public SeaDrop calldata is built locally from on-chain state. The page never asks an API what contract it should send your ETH to.</p></div><span class="badge good">browser-native</span></div>
-      <div class="console-layout">
-        <article class="panel form-panel">
-          <label>NFT contract<input id="nft-contract" spellcheck="false" placeholder="0x..."></label>
-          <div class="field-row"><label>Quantity<input id="quantity" type="number" min="1" max="100" value="1"></label><label>Fee recipient<input id="fee-recipient" spellcheck="false" value="0x0000a26b00c1F0DF003000390027140000fAa719"></label></div>
-          <div class="button-row"><button id="plan-mint" class="secondary">Build plan</button><button id="send-mint" class="primary" disabled>Mint after review</button></div>
-          <div class="security-note"><span>!</span><p><strong>Browser mode:</strong> only public SeaDrop V1 is deterministic here. Signed/allowlist/other routes are handled through the local agent/CLI and remain confirmation-only unless independently verified.</p></div>
-        </article>
-        <article class="panel plan-panel"><div class="panel-head"><div><p class="eyebrow">INTENT RECEIPT</p><h3 id="plan-state">No plan</h3></div><span id="plan-badge" class="badge">idle</span></div><dl id="plan-details" class="details"><div><dt>Target</dt><dd>—</dd></div><div><dt>NFT</dt><dd>—</dd></div><div><dt>Value</dt><dd>—</dd></div><div><dt>Quantity</dt><dd>—</dd></div><div><dt>Window</dt><dd>—</dd></div><div><dt>Simulation</dt><dd>—</dd></div></dl><pre id="console-log">Connect an injected wallet to begin.</pre></article>
-      </div>
-    </section>
-
-    <section class="view" id="view-wallets">
-      <div class="section-intro"><div><p class="eyebrow">WALLET MODEL</p><h2>Two modes. Neither gives the website your key.</h2></div></div>
-      <div class="two-col"><article class="panel"><span class="big-number">01</span><h3>Injected wallet</h3><p>For the public dashboard. MetaMask, Rabby and other injected EVM wallets keep signing in the wallet extension.</p><button id="connect-2" class="primary">Connect injected wallet</button></article><article class="panel"><span class="big-number">02</span><h3>Encrypted local fleet</h3><p>For CLI, VPS and automation. Keys are encrypted with scrypt + AES-256-GCM in a local file. The dashboard HTTP API cannot upload them.</p><code>npm run cli -- vault create wallets.enc.json</code></article></div>
-    </section>
-
-    <section class="view" id="view-automation">
-      <div class="section-intro"><div><p class="eyebrow">LOCAL AUTOMATION</p><h2>AUTO is a policy, not a blind-sign switch.</h2><p>Unattended execution is restricted to independently verifiable plans with spend ceilings and fresh on-chain state.</p></div></div>
-      <div class="mode-grid"><article><span>WATCH</span><strong>Observe only</strong><p>No signing and no spend.</p></article><article><span>CONFIRM</span><strong>Prepare, then ask</strong><p>Default for browser and opaque API routes.</p></article><article><span>AUTO</span><strong>Deterministic only</strong><p>Requires local agent, unlocked encrypted vault and explicit caps.</p></article></div>
-      <article class="panel"><h3>Local agent status</h3><pre id="automation-status">Checking 127.0.0.1:47831…</pre></article>
-    </section>
-
-    <section class="view" id="view-activity">
-      <div class="section-intro"><div><p class="eyebrow">LOCAL SESSION</p><h2>Execution trail</h2><p>The browser keeps this session log locally. CLI/agent execution writes its own structured output.</p></div><button id="clear-log" class="secondary">Clear</button></div>
-      <article class="panel"><div id="activity-list" class="activity-list"></div></article>
-    </section>
-  </main>
-</div>
-<script type="module" src="./app.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
