@@ -3,7 +3,7 @@ export const OPENSEA_FEE_RECIPIENT = '0x0000a26b00c1F0DF003000390027140000fAa719
 
 const records = [
   { key:'ethereum', id:1, name:'Ethereum', currency:'ETH', explorer:'https://etherscan.io', env:'ETHEREUM_RPCS', opensea:'ethereum' },
-  { key:'base', id:8453, name:'Base', currency:'ETH', explorer:'https://basescan.org', env:'BASE_RPCS', opensea:'base', defaultRpcs:['https://mainnet.base.org'], defaultBroadcastRpcs:['https://mainnet-preconf.base.org'] },
+  { key:'base', id:8453, name:'Base', currency:'ETH', explorer:'https://basescan.org', env:'BASE_RPCS', opensea:'base', defaultRpcs:['https://mainnet-preconf.base.org','https://mainnet.base.org'], defaultBroadcastRpcs:['https://mainnet-preconf.base.org'] },
   { key:'robinhood', id:4663, name:'Robinhood Chain', currency:'ETH', explorer:'https://robinhoodchain.blockscout.com', env:'ROBINHOOD_RPCS', opensea:'robinhood', defaultRpcs:['https://rpc.mainnet.chain.robinhood.com'], defaultBroadcastRpcs:['https://sequencer.mainnet.chain.robinhood.com'] },
   { key:'robinhood-testnet', id:46630, name:'Robinhood Chain Testnet', currency:'ETH', explorer:'https://explorer.testnet.chain.robinhood.com', env:'ROBINHOOD_TESTNET_RPCS', defaultRpcs:['https://rpc.testnet.chain.robinhood.com'], defaultBroadcastRpcs:['https://sequencer.testnet.chain.robinhood.com'] },
   { key:'arbitrum', id:42161, name:'Arbitrum One', currency:'ETH', explorer:'https://arbiscan.io', env:'ARBITRUM_RPCS', opensea:'arbitrum' },
