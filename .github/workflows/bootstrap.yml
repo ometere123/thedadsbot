@@ -39,7 +39,9 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Node/security checks
         run: npm run check
-      - name: Solidity formatting
+      - name: Canonical Solidity formatting
+        run: forge fmt
+      - name: Verify Solidity formatting
         run: forge fmt --check
       - name: Solidity tests
         run: forge test -vvv
