@@ -1,3 +1,6 @@
+import http from 'node:http';
+import https from 'node:https';
+
 export class RpcError extends Error {
   constructor(message,{url,method,cause}={}){ super(message); this.name='RpcError'; this.url=url; this.method=method; this.cause=cause; }
 }
@@ -50,8 +53,34 @@ export async function broadcastRaw(urls,rawTx,{timeoutMs=5000}={}){
   return accepted;
 }
 
-// Race Mode prepares the exact JSON body before launch so T=0 has no encoding,
-// hashing, signing or JSON serialisation work left to do.
+// Race Mode has its own explicit persistent HTTP/1.1 pools. Warming and firing
+// use the same Agent instance, so a healthy endpoint can reuse the exact socket
+// whose DNS/TCP/TLS setup was paid before launch.
+const raceAgents=new Map();
+function raceAgent(url){
+  const parsed=new URL(url),key=`${parsed.protocol}//${parsed.host}`;let agent=raceAgents.get(key);if(agent)return agent;
+  const options={keepAlive:true,keepAliveMsecs:15000,maxSockets:32,maxFreeSockets:16,scheduling:'lifo'};
+  agent=parsed.protocol==='https:'?new https.Agent(options):new http.Agent(options);raceAgents.set(key,agent);return agent;
+}
+function racePost(url,body,{timeoutMs=3500}={}){
+  return new Promise((resolve,reject)=>{
+    let parsed;try{parsed=new URL(url);}catch(error){reject(new RpcError('invalid RPC URL',{url,method:'eth_sendRawTransaction',cause:error}));return;}
+    if(!['http:','https:'].includes(parsed.protocol)){reject(new RpcError('RPC URL must be http(s)',{url,method:'eth_sendRawTransaction'}));return;}
+    const lib=parsed.protocol==='https:'?https:http,startedPerf=performance.now();
+    const req=lib.request(parsed,{method:'POST',agent:raceAgent(url),headers:{'content-type':'application/json','content-length':Buffer.byteLength(body),'connection':'keep-alive'}},res=>{
+      const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('end',()=>{
+        const endedPerf=performance.now(),text=Buffer.concat(chunks).toString('utf8');let json={};try{json=text?JSON.parse(text):{};}catch{}
+        if((res.statusCode||500)>=400){reject(new RpcError(`RPC HTTP ${res.statusCode}`,{url,method:'eth_sendRawTransaction'}));return;}
+        resolve({json,latencyMs:endedPerf-startedPerf,reusedSocket:Boolean(req.reusedSocket),endedPerf});
+      });
+    });
+    req.setTimeout(timeoutMs,()=>req.destroy(new RpcError('RPC timeout',{url,method:'eth_sendRawTransaction'})));
+    req.on('error',error=>reject(error instanceof RpcError?error:new RpcError(String(error?.message||error),{url,method:'eth_sendRawTransaction',cause:error})));
+    req.end(body);
+  });
+}
+
+// Prepare both the signed bytes and exact RPC body before T=0.
 export function prepareRawBroadcast(rawTx,{id=1}={}){
   if(!/^0x[0-9a-f]+$/i.test(String(rawTx||'')))throw new Error('raw transaction must be hex');
   return Object.freeze({rawTx,body:JSON.stringify({jsonrpc:'2.0',method:'eth_sendRawTransaction',params:[rawTx],id})});
@@ -63,47 +92,34 @@ function knownTxError(message=''){
 }
 
 async function postPrepared(url,body,{timeoutMs,expectedHash,index,launchPerf,launchEpochMs}){
-  if(!/^https?:\/\//i.test(String(url||'')))throw new RpcError('RPC URL must be http(s)',{url,method:'eth_sendRawTransaction'});
-  const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),timeoutMs);const startedPerf=performance.now();
-  try{
-    const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body,signal:ctrl.signal,redirect:'error',keepalive:true});
-    const acceptedPerf=performance.now();let json={};try{json=await response.json();}catch{}
-    if(!response.ok)throw new RpcError(`RPC HTTP ${response.status}`,{url,method:'eth_sendRawTransaction'});
-    if(json.result){
-      const hash=String(json.result);if(expectedHash&&hash.toLowerCase()!==String(expectedHash).toLowerCase())throw new RpcError('RPC returned conflicting transaction hash',{url,method:'eth_sendRawTransaction'});
-      return {url,index,accepted:true,hash,latencyMs:acceptedPerf-startedPerf,acceptedMsFromDispatch:acceptedPerf-launchPerf,acceptedEpochMs:launchEpochMs+(acceptedPerf-launchPerf)};
-    }
-    const message=json?.error?.message||'RPC returned no transaction hash';
-    if(expectedHash&&knownTxError(message))return {url,index,accepted:true,hash:expectedHash,alreadyKnown:true,latencyMs:acceptedPerf-startedPerf,acceptedMsFromDispatch:acceptedPerf-launchPerf,acceptedEpochMs:launchEpochMs+(acceptedPerf-launchPerf)};
-    throw new RpcError(message,{url,method:'eth_sendRawTransaction'});
-  }catch(error){
-    if(error instanceof RpcError)throw error;
-    throw new RpcError(error?.name==='AbortError'?'RPC timeout':String(error?.message||error),{url,method:'eth_sendRawTransaction',cause:error});
-  }finally{clearTimeout(timer);}
+  const startedPerf=performance.now(),response=await racePost(url,body,{timeoutMs}),acceptedPerf=response.endedPerf,json=response.json;
+  if(json.result){
+    const hash=String(json.result);if(expectedHash&&hash.toLowerCase()!==String(expectedHash).toLowerCase())throw new RpcError('RPC returned conflicting transaction hash',{url,method:'eth_sendRawTransaction'});
+    return {url,index,accepted:true,hash,reusedSocket:response.reusedSocket,latencyMs:acceptedPerf-startedPerf,acceptedMsFromDispatch:acceptedPerf-launchPerf,acceptedEpochMs:launchEpochMs+(acceptedPerf-launchPerf)};
+  }
+  const message=json?.error?.message||'RPC returned no transaction hash';
+  if(expectedHash&&knownTxError(message))return {url,index,accepted:true,hash:expectedHash,alreadyKnown:true,reusedSocket:response.reusedSocket,latencyMs:acceptedPerf-startedPerf,acceptedMsFromDispatch:acceptedPerf-launchPerf,acceptedEpochMs:launchEpochMs+(acceptedPerf-launchPerf)};
+  throw new RpcError(message,{url,method:'eth_sendRawTransaction'});
 }
 
 // Starts every request synchronously in one event-loop turn and returns before
-// waiting on any network response. firstAccepted resolves as soon as one RPC
-// confirms it accepted the exact signed bytes; allSettled is for later telemetry.
+// waiting on any response. Inclusion latency is therefore independent of the
+// slowest endpoint. firstAccepted and allSettled exist only for telemetry/UX.
 export function blastPreparedRaw(urls,prepared,{expectedHash,timeoutMs=3500}={}){
   const unique=[...new Set((urls||[]).filter(Boolean))];if(!unique.length)throw new RpcQuorumError('no broadcast RPCs configured');
   const body=typeof prepared==='string'?prepareRawBroadcast(prepared).body:prepared?.body;if(!body)throw new Error('prepared broadcast body required');
   const launchEpochMs=Date.now(),launchPerf=performance.now();
   const tasks=unique.map((url,index)=>postPrepared(url,body,{timeoutMs,expectedHash,index,launchPerf,launchEpochMs}));
   const dispatchDurationMs=performance.now()-launchPerf;
-  const firstAccepted=Promise.any(tasks).catch(async error=>{
-    const rows=await Promise.allSettled(tasks);throw new RpcQuorumError('all transaction broadcasts failed',rows.map((row,i)=>({url:unique[i],ok:row.status==='fulfilled',error:row.status==='rejected'?String(row.reason?.message||row.reason):undefined})),{cause:error});
-  });
+  const firstAccepted=Promise.any(tasks).catch(async()=>{const rows=await Promise.allSettled(tasks);throw new RpcQuorumError('all transaction broadcasts failed',rows.map((row,i)=>({url:unique[i],ok:row.status==='fulfilled',error:row.status==='rejected'?String(row.reason?.message||row.reason):undefined})));});
   const allSettled=Promise.allSettled(tasks).then(rows=>rows.map((row,i)=>row.status==='fulfilled'?row.value:{url:unique[i],index:i,accepted:false,error:String(row.reason?.message||row.reason)}));
   return {launchEpochMs,launchPerf,dispatchDurationMs,firstAccepted,allSettled};
 }
 
-// Warm exactly the write path. Some sequencer/write endpoints reject read
-// methods, so an intentionally-invalid raw transaction is used and the response
-// is ignored; the goal is to establish DNS/TCP/TLS/HTTP state before launch.
+// Warm the same write method through the same persistent Agents. An invalid raw
+// tx is intentional: write-only sequencer endpoints still establish a socket.
 export async function warmRpcConnections(urls,{timeoutMs=800}={}){
-  const unique=[...new Set((urls||[]).filter(Boolean))];
-  const body=JSON.stringify({jsonrpc:'2.0',method:'eth_sendRawTransaction',params:['0x00'],id:1});
-  const rows=await Promise.allSettled(unique.map(async url=>{const t=performance.now();const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),timeoutMs);try{await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body,signal:ctrl.signal,redirect:'error',keepalive:true});return {url,ok:true,latencyMs:performance.now()-t};}catch(error){return {url,ok:false,error:String(error?.message||error),latencyMs:performance.now()-t};}finally{clearTimeout(timer);}}));
+  const unique=[...new Set((urls||[]).filter(Boolean))],body=JSON.stringify({jsonrpc:'2.0',method:'eth_sendRawTransaction',params:['0x00'],id:1});
+  const rows=await Promise.allSettled(unique.map(async url=>{const started=performance.now();try{const row=await racePost(url,body,{timeoutMs});return {url,ok:true,reusedSocket:row.reusedSocket,latencyMs:performance.now()-started};}catch(error){return {url,ok:false,error:String(error?.message||error),latencyMs:performance.now()-started};}}));
   return rows.map((row,i)=>row.status==='fulfilled'?row.value:{url:unique[i],ok:false,error:String(row.reason?.message||row.reason)});
 }
