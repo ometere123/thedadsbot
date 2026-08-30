@@ -35,6 +35,9 @@ jobs:
           }
           console.log(`expanded ${Object.keys(files).length} TheDadBot files`);
           NODE
+          if ! grep -q '^via_ir = true$' foundry.toml; then
+            sed -i '/^optimizer_runs = /a via_ir = true' foundry.toml
+          fi
       - name: Install dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Node/security checks
