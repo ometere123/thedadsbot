@@ -4,7 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import readline from 'node:readline';
 import {
-  benchmarkRpcs, buildMintTransaction, buildPublicMintPlan, chainByKey, classifyOpenSeaPlan,
+  benchmarkRpcs, broadcastRpcUrlsFor, buildMintTransaction, buildPublicMintPlan, chainByKey, classifyOpenSeaPlan,
   createInstantApiKey, defaultRaceGasLimit, executePlanWithPrivateKey, getDrop, getEligibility,
   launchPreparedRaceTransaction, listChains, listDrops, loadVault, prepareRaceTransaction,
   readPublicDrop, redactVault, rpcUrlsFor, saveVault, waitUntilEpoch, warmRpcConnections
@@ -58,10 +58,11 @@ function help(){console.log(`TheDadBot CLI
       [--arm-ms 3000] [--warm-lead-ms 600] [--launch-offset-ms 0] [--spin-ms 4]
       [--rpc url1,url2] [--broadcast-rpc url1,url2] [--report .data/race-last.json]
 
+Race Mode reads from <CHAIN>_RPCS and, when configured, fans out through <CHAIN>_BROADCAST_RPCS. Explicit --broadcast-rpc overrides the local broadcast env.
 Race Mode is deterministic SeaDrop only. It signs shortly before launch and holds the exact raw tx so T=0 only performs parallel broadcast.
 Private keys are never accepted as command arguments or .env values.`);}
 
-async function cmdDoctor(){const rows=[];for(const c of listChains()){const urls=rpcUrlsFor(c);if(!urls.length){rows.push({chain:c.name,id:c.id,status:'no RPC configured'});continue;}const bench=await benchmarkRpcs(urls,{timeoutMs:3500});rows.push({chain:c.name,id:c.id,best:bench.find(x=>x.ok)||bench[0]});}out({product:'TheDadBot',node:process.version,agentPort:Number(process.env.THEDADBOT_AGENT_PORT||47831),chains:rows,openseaApiKey:Boolean(await getApiKey()),walletJwt:Boolean(await getWalletJwt())});}
+async function cmdDoctor(){const rows=[];for(const c of listChains()){const urls=rpcUrlsFor(c);if(!urls.length){rows.push({chain:c.name,id:c.id,status:'no RPC configured'});continue;}const bench=await benchmarkRpcs(urls,{timeoutMs:3500});rows.push({chain:c.name,id:c.id,best:bench.find(x=>x.ok)||bench[0],raceBroadcastEndpoints:broadcastRpcUrlsFor(c).length});}out({product:'TheDadBot',node:process.version,agentPort:Number(process.env.THEDADBOT_AGENT_PORT||47831),chains:rows,openseaApiKey:Boolean(await getApiKey()),walletJwt:Boolean(await getWalletJwt())});}
 
 async function cmdVault(args){
   const action=args[1],file=args[2]||'wallets.enc.json';
@@ -110,8 +111,8 @@ async function cmdRace(args){
   console.log(`Benchmarking ${configured.length} RPC endpoint(s) for ${chain.name}...`);
   const bench=await benchmarkRpcs(configured,{timeoutMs:2500}),healthy=bench.filter(x=>x.ok&&Number(x.chainId)===Number(chain.id));
   if(!healthy.length)throw new Error('no healthy RPC matched the target chain');
-  const readRpcs=healthy.map(x=>x.url),explicitBroadcast=csv(flag(args,'--broadcast-rpc')),broadcastRpcs=explicitBroadcast.length?explicitBroadcast:readRpcs;
-  out({raceRpcOrder:healthy.map(x=>({url:x.url,latencyMs:x.latencyMs,headLag:x.headLag}))});
+  const readRpcs=healthy.map(x=>x.url),explicitBroadcast=csv(flag(args,'--broadcast-rpc')),localBroadcast=broadcastRpcUrlsFor(chain),broadcastRpcs=explicitBroadcast.length?explicitBroadcast:localBroadcast.length?localBroadcast:readRpcs;
+  out({raceRpcOrder:healthy.map(x=>({url:x.url,latencyMs:x.latencyMs,headLag:x.headLag})),broadcastRpcSource:explicitBroadcast.length?'cli':localBroadcast.length?'local-env':'healthy-read-fallback',broadcastRpcCount:broadcastRpcs.length});
 
   const maxGas=flag(args,'--max-gas-wei'),maxTotal=flag(args,'--max-total-wei');if(maxGas==null||maxTotal==null)throw new Error('Race Mode requires --max-gas-wei and --max-total-wei');
   const armMs=intArg(flag(args,'--arm-ms',3000),'arm ms',{min:750,max:15000}),warmLeadMs=intArg(flag(args,'--warm-lead-ms',600),'warm lead ms',{min:0,max:3000});
@@ -136,13 +137,13 @@ async function cmdRace(args){
   });
   const target=Math.max(Date.now(),prepared.plan.startTime*1000+launchOffsetMs);
   console.log('RACE ARMED — raw transaction is signed locally and held. Nothing expensive remains at T=0.');
-  out({wallet:prepared.account,txHash:prepared.txHash,fingerprint:prepared.fingerprint,target:new Date(target).toISOString(),nonce:prepared.nonce,gasLimit:prepared.gasLimit,maxFeePerGas:prepared.maxFeePerGas,maxPriorityFeePerGas:prepared.maxPriorityFeePerGas,simulation:prepared.simulation,broadcastRpcs});
+  out({wallet:prepared.account,txHash:prepared.txHash,fingerprint:prepared.fingerprint,target:new Date(target).toISOString(),nonce:prepared.nonce,gasLimit:prepared.gasLimit,maxFeePerGas:prepared.maxFeePerGas,maxPriorityFeePerGas:prepared.maxPriorityFeePerGas,simulation:prepared.simulation,broadcastRpcCount:broadcastRpcs.length});
 
   await warmRpcConnections(broadcastRpcs,{timeoutMs:800});
   if(warmLeadMs&&target-Date.now()>warmLeadMs+300){await waitUntilEpoch(target-warmLeadMs,{spinMs:0});await warmRpcConnections(broadcastRpcs,{timeoutMs:Math.min(250,Math.max(80,warmLeadMs-100))});}
   const result=await launchPreparedRaceTransaction({prepared,broadcastRpcUrls:broadcastRpcs,triggerAtEpochMs:target,spinMs,launchOffsetMs:0});
-  const report=flag(args,'--report',path.join(DATA_DIR,'race-last.json'));await savePrivateJson(report,{createdAt:new Date().toISOString(),chain:x.chain,bench:healthy,txHash:result.hash,telemetry:result.telemetry,broadcasts:result.broadcasts,post:result.post});
-  console.log(`Race report saved to ${report}`);out(result);
+  const report=flag(args,'--report',path.join(DATA_DIR,'race-last.json'));await savePrivateJson(report,{createdAt:new Date().toISOString(),chain:x.chain,bench:healthy.map(({url,...rest})=>({...rest,url:new URL(url).origin})),txHash:result.hash,telemetry:result.telemetry,broadcasts:result.broadcasts.map(row=>({...row,url:new URL(row.url).origin})),post:result.post});
+  console.log(`Race report saved to ${report}`);out({...result,broadcasts:result.broadcasts.map(row=>({...row,url:new URL(row.url).origin}))});
 }
 
 const args=process.argv.slice(2);try{
