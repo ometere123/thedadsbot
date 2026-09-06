@@ -20,7 +20,7 @@ jobs:
       - name: Build distributable archive
         run: |
           tar --exclude='.git' --exclude='node_modules' -czf thedadbot-${GITHUB_REF_NAME}.tar.gz .
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: thedadbot-${{ github.ref_name }}.tar.gz
           generate_release_notes: true
