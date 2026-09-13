@@ -21,7 +21,7 @@
   "dependencies": {
     "@opensea/sdk": "^11.9.0",
     "ethers": "^6.15.0",
-    "react": "^19.1.1",
+    "react": "^19.3.0",
     "react-dom": "^19.1.1",
     "viem": "^2.0.0"
   },
